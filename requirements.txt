@@ -1,0 +1,19 @@
+# --- 核心框架 ---
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+requests
+
+# --- AI 模型 (Role B 會用到) ---
+google-generativeai
+
+# --- 資料庫相關 (Day 2 會用到，先幫你預留) ---
+# 如果你們是用 MySQL，請保留下面這行；如果是 PostgreSQL，改成 psycopg2
+mysql-connector-python
+
+# --- 向量資料庫 (依你們選擇的工具而定) ---
+# 如果是用雲端的 Pinecone，請用這行：
+# pinecone-client
+# 如果是用本機的 ChromaDB，請用這行：
+# chromadb

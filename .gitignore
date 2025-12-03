@@ -1,0 +1,14 @@
+# --- 最重要的兩個 ---
+.env
+venv/
+
+# --- Python 編譯產生的垃圾檔 ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Mac 系統產生的垃圾檔 (如果你是用 Mac) ---
+.DS_Store
+
+# --- VS Code 設定檔 (選填，通常也不用上傳) ---
+.vscode/
