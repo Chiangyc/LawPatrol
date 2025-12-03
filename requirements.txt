@@ -11,8 +11,8 @@ google-generativeai
 # --- 資料庫相關 ---
 psycopg2-binary
 
-# --- 向量資料庫 (依你們選擇的工具而定) ---
+# --- 向量資料庫  ---
 # 如果是用雲端的 Pinecone，請用這行：
-# pinecone-client
+pinecone-client
 # 如果是用本機的 ChromaDB，請用這行：
-chromadb
+# chromadb
