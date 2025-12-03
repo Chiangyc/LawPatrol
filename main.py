@@ -1,5 +1,3 @@
-# 主程式 (API 路由)
-# main.py
 import uvicorn
 import os
 from fastapi import FastAPI, HTTPException
@@ -20,19 +18,16 @@ app = FastAPI(
 )
 
 # 3. 設定 CORS (跨來源資源共用)
-#這是 Chrome Extension 開發最重要的一步，沒設這個前端會完全連不上
 origins = [
-    "*", # 開發階段允許所有來源 (包含 localhost, 擴充功能 ID)
-    # 上線後建議改為特定的 Extension ID，例如:
-    # "chrome-extension://ajhifk...", 
+    "*", 
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"], # 允許所有 HTTP 方法 (POST, GET...)
-    allow_headers=["*"], # 允許所有 Header
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
 # --- API 路由區 ---
@@ -49,28 +44,23 @@ async def check_compliance(request: CheckRequest):
     目前階段：回傳 Mock Data (假資料) 供前端測試 UI
     """
     print(f"收到請求 User ID: {request.user_id}")
-    print(f"檢查文字片段: {request.selected_text[:20]}...") # 只印前20個字避免 Log 太長
+    print(f"檢查文字片段: {request.selected_text[:20]}...") 
 
     # =========================================================
-    # TODO: Day 3 合體區 (未來要解開註解並替換假資料)
-    # ---------------------------------------------------------
-    # from logic import run_compliance_logic
-    # real_result = run_compliance_logic(request.selected_text)
-    # return real_result
+    # TODO: Day 3 合體區 
     # =========================================================
 
     # --- Day 1-2: Mock Data (假資料回傳) ---
-    # 這裡的結構必須嚴格遵守 schemas.py 定義的 CheckResponse
     
     mock_response = CheckResponse(
         status="success",
         data=ComplianceData(
             category="Food",
-            overall_risk="High",
+            risk=0.8, # 80% 風險
             highlights=[
                 HighlightItem(
-                    original_text="甩油",
-                    start_index=12, # 假裝這是前端算出來的位置
+                    trigger_words="甩油", # 【修正】這裡必須跟 schema 的 trigger_words 一致
+                    start_index=12, 
                     end_index=14,
                     details=HighlightDetails(
                         reason="該詞彙暗示體重減輕或脂肪消除，屬於食品廣告中涉及『減肥』之違規詞句，違反食安法第28條。",
@@ -85,7 +75,7 @@ async def check_compliance(request: CheckRequest):
                     )
                 ),
                 HighlightItem(
-                    original_text="改善糖尿病",
+                    trigger_words="改善糖尿病", # 【修正】這裡也改成 trigger_words
                     start_index=18,
                     end_index=23,
                     details=HighlightDetails(
@@ -106,7 +96,5 @@ async def check_compliance(request: CheckRequest):
 
     return mock_response
 
-# 讓這個檔案可以直接用 python main.py 執行
 if __name__ == "__main__":
-    # reload=True 代表你改程式碼存檔後，Server 會自動重啟，開發很方便
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

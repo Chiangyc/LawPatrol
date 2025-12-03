@@ -16,4 +16,4 @@ mysql-connector-python
 # 如果是用雲端的 Pinecone，請用這行：
 # pinecone-client
 # 如果是用本機的 ChromaDB，請用這行：
-# chromadb
+chromadb
