@@ -15,8 +15,9 @@ class CheckRequest(BaseModel):
 
 # --- 第一次 LLM 回傳 (辨識 Tag 與觸發詞) ---
 class IdentifiedTag(BaseModel):
-    tag_name: str        # 例如 "醫療效能", "減肥瘦身"
-    trigger_words: List[str] # 例如 ["甩油", "消肚子"] (注意這裡是 List)
+    tag_name: str
+    trigger_words: List[str]
+
 
 class LLM1Response(BaseModel):
     category: str        # 產業 (Food, Cosmetic...)
@@ -42,10 +43,11 @@ class LLM2CaseRef(BaseModel):
     date: str
 
 class LLM2Analysis(BaseModel):
-    trigger_words: str   # 這裡變成單一字串，針對特定的詞給建議
+    trigger_word: str
     reason: str
     suggestion: str
     reference_cases: List[LLM2CaseRef]
+
 
 class LLM2Response(BaseModel):
     analysis_results: List[LLM2Analysis]
