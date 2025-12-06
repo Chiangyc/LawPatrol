@@ -121,7 +121,7 @@ def sync_data():
                 FROM public.violation_cases
                 WHERE {where_clause}
                 ORDER BY id
-                LIMIT 200;   -- 🔧 想同步更多就改這裡
+                LIMIT 242;   -- 🔧 想同步更多就改這裡
             """
 
             print("\n🔍 即將執行 SQL：")

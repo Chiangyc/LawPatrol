@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+# 風險分數：只用新的方案 B
+from database import calculate_combined_risk
+
 # Pydantic Schemas
 from schemas import (
     CheckRequest,
@@ -16,18 +19,11 @@ from schemas import (
     FinalCase,
 )
 
-# ✨ 這裡改成載入 async 版本
+# ✨ 載入 async 版本邏輯
 from logic import process_compliance_check_async
 
 # 找出關鍵字在原文中的位置
 from utils import find_text_indices
-
-# 風險分數相關
-try:
-    from database import calculate_max_risk
-except ImportError:
-    calculate_max_risk = None
-    print("⚠️ 警告: 無法從 database 匯入 calculate_max_risk，將使用預設 0.0 風險")
 
 
 # 1. 載入環境變數 (讀取 .env)
@@ -88,14 +84,16 @@ async def check_compliance(request: CheckRequest):
     industry = step1_output.get("industry", "Unknown") or "Unknown"
     category = industry  # 先直接用 industry 當 category
 
-    # ---------- 3. 風險分數 ----------
+    # ---------- 3. 風險分數 (方案 B：combined risk) ----------
     identified_tags = step1_output.get("identified_tags", []) or []
     tag_names = [item.get("tag") for item in identified_tags if item.get("tag")]
 
     risk = 0.0
-    if calculate_max_risk and tag_names:
+    if tag_names:
         try:
-            risk = float(calculate_max_risk(tag_names))
+            # calculate_combined_risk 會自己去 DB 查每個 tag 的歷史比例，
+            # 再依照「這段文字實際踩到哪些 tag」組合出 0~1 之間的整體風險。
+            risk = float(calculate_combined_risk(tag_names))
         except Exception as e:
             print(f"⚠️ 計算風險分數時發生錯誤: {e}")
             risk = 0.0

@@ -64,11 +64,11 @@ def build_unlabeled_where_clause() -> str:
     return " AND ".join(parts)
 
 
-
 UNLABELED_WHERE = build_unlabeled_where_clause()
 
 
-# ========= 4. 呼叫 LLM 做 Step1：辨識產業 & Tag =========
+# ========= 4. 呼叫 LLM 做 Step1：辨識 Tag =========
+# （industry 有沒有都無所謂，我們只用 identified_tags）
 
 def call_step1_llm(text: str):
     tags_context = get_formatted_tags_prompt()
@@ -85,13 +85,13 @@ def call_step1_llm(text: str):
     return data
 
 
-# ========= 5. 把 LLM 的結果轉成 DB 需要的欄位更新 =========
+# ========= 5. 把 LLM 的結果轉成「只更新 Tag 欄位」 =========
 
-def build_update_fields_from_step1(step1_result):
+def build_tag_update_fields(step1_result):
     """
     step1_result 範例：
     {
-      "industry": "Food",
+      "industry": "Food",   # ⚠️ 這個現在會被忽略
       "identified_tags": [
         { "tag": "保證承諾", "trigger_words": ["保證"] },
         { "tag": "燃脂瘦身", "trigger_words": ["甩油"] }
@@ -99,9 +99,8 @@ def build_update_fields_from_step1(step1_result):
     }
 
     回傳：
-    industry_value, { "tag_guarantee": 1, "tag_slimming": 1 }
+    { "tag_guarantee": 1, "tag_slimming": 1 }
     """
-    industry = step1_result.get("industry") or None
     identified = step1_result.get("identified_tags", []) or []
 
     update_map = {}
@@ -116,15 +115,15 @@ def build_update_fields_from_step1(step1_result):
             # 不在定義裡的 Tag 先忽略
             continue
 
-        update_map[col] = 1  # 我們現在只記「有 / 沒有」，就寫 1
+        update_map[col] = 1  # 只記「有 / 沒有」
 
-    return industry, update_map
+    return update_map
 
 
 # ========= 6. 主流程：批次撈資料 -> LLM 標 Tag -> 回寫 =========
 
 def auto_tag_loop():
-    print("🚀 auto_tag_cases 啟動")
+    print("🚀 auto_tag_cases 啟動（只更新 Tag，不修改 industry）")
 
     conn = get_conn()
     conn.autocommit = False  # 用 transaction 批次 commit
@@ -179,19 +178,15 @@ def auto_tag_loop():
                     print(f"❌ LLM 呼叫失敗，略過此筆: {e}")
                     continue
 
-                industry, update_fields = build_update_fields_from_step1(step1)
+                update_fields = build_tag_update_fields(step1)
 
-                if not update_fields and not industry:
+                if not update_fields:
                     print("ℹ️ 沒有偵測到任何符合定義的 Tag，略過更新")
                     continue
 
-                # --- 組 UPDATE SQL ---
+                # --- 組 UPDATE SQL（只更新 tag 欄位） ---
                 set_clauses = []
                 params = []
-
-                if industry:
-                    set_clauses.append("industry = %s")
-                    params.append(industry)
 
                 for col, val in update_fields.items():
                     set_clauses.append(f"{col} = %s")
@@ -208,7 +203,7 @@ def auto_tag_loop():
                 with conn.cursor() as cur2:
                     cur2.execute(update_sql, params)
 
-                print(f"✅ 已更新 ID {case_id} 的 Tag 欄位：{list(update_fields.keys())}，industry={industry}")
+                print(f"✅ 已更新 ID {case_id} 的 Tag 欄位：{list(update_fields.keys())}")
                 processed_total += 1  # ⭐ 累計總共處理幾筆
 
                 # 避免打太快被 API 限速，可依情況調整或拿掉

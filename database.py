@@ -139,10 +139,28 @@ def get_risk_info(tag_name: str) -> float:
         conn.close()
 
 
-def calculate_max_risk(tags: List[str]) -> float:
+def calculate_combined_risk(tags: List[str]) -> float:
+    """
+    方案 B：合併多個標籤風險：
+    risk = 1 - (1 - p1) * (1 - p2) * ... * (1 - pn)
+    """
     if not tags:
         return 0.0
-    return max(get_risk_info(tag) for tag in tags)
+
+    probabilities = [get_risk_info(tag) for tag in tags if get_risk_info(tag) > 0]
+
+    if not probabilities:
+        return 0.0
+
+    no_risk_prob = 1.0
+    for p in probabilities:
+        no_risk_prob *= (1 - p)
+
+    combined = 1 - no_risk_prob
+
+    # 避免小數誤差太長
+    return round(combined, 3)
+
 
 
 # ======================================================
@@ -187,13 +205,24 @@ def search_vector_cases(user_text: str, tag: str, industry: str | None = None, t
     if embedding is None:
         return []
 
-    # 準備 filter：至少要 tag 符合
+    # --- 🔧 這裡開始改 ---
     filter_dict = {
         "tag_name": {"$in": [tag]}
     }
-    # 若有傳入 industry，就一併限制（Food, Cosmetic, Medicine, Device）
+
+    # LLM 給的是英文 (Food/Cosmetic/Medicine/Device)
+    # DB / Pinecone 存的是中文 (食物/化妝品/藥品/醫療器材)
+    EN_TO_ZH_INDUSTRY = {
+        "Food": "食物",
+        "Cosmetic": "化妝品",
+        "Medicine": "藥品",
+        "Device": "醫療器材",
+    }
+
     if industry:
-        filter_dict["industry"] = industry
+        mapped = EN_TO_ZH_INDUSTRY.get(industry, industry)
+        filter_dict["industry"] = mapped
+    # --- 🔧 改到這裡為止 ---
 
     try:
         result = index.query(
@@ -222,6 +251,7 @@ def search_vector_cases(user_text: str, tag: str, industry: str | None = None, t
         })
 
     return output
+
 
 
 
