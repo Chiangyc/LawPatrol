@@ -2,17 +2,19 @@
 fastapi
 uvicorn[standard]
 pydantic
+pydantic[email]
 python-dotenv
 requests
 
-# --- AI 模型 (Role B 會用到) ---
+# --- AI 模型 (Gemini) ---
 google-generativeai
 
-# --- 資料庫相關 ---
+# --- 資料庫 Postgres ---
 psycopg2-binary
 
-# --- 向量資料庫  ---
-# 如果是用雲端的 Pinecone，請用這行：
+# --- 向量資料庫 Pinecone ---
 pinecone-client
-# 如果是用本機的 ChromaDB，請用這行：
-# chromadb
+pinecone
+
+# --- async 建議套件 ---
+aiohttp
