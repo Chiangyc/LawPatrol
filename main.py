@@ -6,8 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# 風險分數：只用新的方案 B
-from database import calculate_combined_risk
+# 風險相關
+from database import get_risk_info, calculate_combined_risk
 
 # Pydantic Schemas
 from schemas import (
@@ -84,15 +84,15 @@ async def check_compliance(request: CheckRequest):
     industry = step1_output.get("industry", "Unknown") or "Unknown"
     category = industry  # 先直接用 industry 當 category
 
-    # ---------- 3. 風險分數 (方案 B：combined risk) ----------
+    # ---------- 3. 總風險分數 (方案 B：combined risk) ----------
     identified_tags = step1_output.get("identified_tags", []) or []
     tag_names = [item.get("tag") for item in identified_tags if item.get("tag")]
 
     risk = 0.0
     if tag_names:
         try:
-            # calculate_combined_risk 會自己去 DB 查每個 tag 的歷史比例，
-            # 再依照「這段文字實際踩到哪些 tag」組合出 0~1 之間的整體風險。
+            # calculate_combined_risk：自己去 DB 查每個 tag 的歷史比例，
+            # 再依照這段文字踩到哪些 tag 組出 0~1 的整體風險
             risk = float(calculate_combined_risk(tag_names))
         except Exception as e:
             print(f"⚠️ 計算風險分數時發生錯誤: {e}")
@@ -116,13 +116,20 @@ async def check_compliance(request: CheckRequest):
 
     for analysis in analysis_results:
         trigger_word = analysis.get("trigger_word")
-        tag = analysis.get("tag")
+        tag = analysis.get("tag")  # LLM 回傳的 tag 名稱（例如「燃脂瘦身」）
         reason = analysis.get("reason", "") or ""
         suggestion = analysis.get("suggestion", "") or ""
         reference_cases = analysis.get("reference_cases", []) or []
 
-        if not trigger_word:
+        if not trigger_word or not tag:
             continue
+
+        # 5-0. 單一 tag 的歷史風險
+        try:
+            tag_risk_value = float(get_risk_info(tag))
+        except Exception as e:
+            print(f"⚠️ 取得單一 tag 風險失敗 ({tag}): {e}")
+            tag_risk_value = 0.0
 
         # 5-1. 找這個字在原文的所有位置
         positions = find_text_indices(user_text, trigger_word)
@@ -154,16 +161,23 @@ async def check_compliance(request: CheckRequest):
                     )
                 )
 
+        # 🔴 新規則：如果這個 tag 最後沒有任何案例，就整段刪掉，不輸出給前端
+        if not final_cases:
+            print(f"ℹ️ Tag「{tag}」沒有對應案例，略過此 tag 的 highlight")
+            continue
+
         details = HighlightDetails(
             reason=reason,
             suggestion=suggestion,
             cases=final_cases,
         )
 
-        # 5-3. 每個出現位置都生一個 highlight item
+        # 5-3. 每個出現位置都生一個 highlight item（帶上 tag_name & tag_risk）
         for pos in positions:
             highlights.append(
                 HighlightItem(
+                    tag_name=tag,
+                    tag_risk=tag_risk_value,
                     trigger_words=trigger_word,
                     start_index=pos.get("start", -1),
                     end_index=pos.get("end", -1),

@@ -68,7 +68,9 @@ class HighlightDetails(BaseModel):
     cases: List[FinalCase]
 
 class HighlightItem(BaseModel):
-    trigger_words: str # 對應前端的 original_text (這裡是你改對的地方)
+    tag_name: str          # 新增：標籤名稱，例如「燃脂瘦身」
+    tag_risk: float        # 新增：單一 tag 的歷史風險 (0~1)
+    trigger_words: str     # 對應前端的 original_text
     start_index: int
     end_index: int
     details: HighlightDetails
