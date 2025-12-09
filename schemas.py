@@ -44,13 +44,15 @@ class LLM2CaseRef(BaseModel):
 
 class LLM2Analysis(BaseModel):
     trigger_word: str
+    tag: str
     reason: str
-    suggestion: str
+    law: str
     reference_cases: List[LLM2CaseRef]
-
 
 class LLM2Response(BaseModel):
     analysis_results: List[LLM2Analysis]
+    suggestion: str
+
 
 
 # ==========================================
@@ -61,24 +63,30 @@ class FinalCase(BaseModel):
     product_name: str
     date: str
     link: str
+    explanation: str   # 新增：違規情節說明
+
 
 class HighlightDetails(BaseModel):
     reason: str
-    suggestion: str
+    law: str                    # 新增：可能觸犯的法律
     cases: List[FinalCase]
 
+
 class HighlightItem(BaseModel):
-    tag_name: str          # 新增：標籤名稱，例如「燃脂瘦身」
-    tag_risk: float        # 新增：單一 tag 的歷史風險 (0~1)
+    tag_name: str          # 標籤名稱，例如「燃脂瘦身」
+    tag_risk: float        # 單一 tag 的歷史風險 (0~1)
     trigger_words: str     # 對應前端的 original_text
     start_index: int
     end_index: int
     details: HighlightDetails
 
+
 class ComplianceData(BaseModel):
     category: str
     risk: float  # 例如 0.8 (對應 80%)
     highlights: List[HighlightItem]
+    suggestion: str        # 新增：整段文案的改寫建議
+
 
 class CheckResponse(BaseModel):
     status: str

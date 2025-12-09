@@ -86,6 +86,7 @@ async def check_compliance(request: CheckRequest):
 
     # ---------- 3. 總風險分數 (方案 B：combined risk) ----------
     identified_tags = step1_output.get("identified_tags", []) or []
+    # step1_output 裡的每個 tag 物件長得像：{"tag": "...", "trigger_words": [...]}
     tag_names = [item.get("tag") for item in identified_tags if item.get("tag")]
 
     risk = 0.0
@@ -103,6 +104,10 @@ async def check_compliance(request: CheckRequest):
     print(f"📊 本段文案風險分數 (0~1): {risk}")
 
     # ---------- 4. 把向量搜尋結果做成 tag -> cases 對照表 ----------
+    # vector_search_results: [
+    #   {"tag": "燃脂瘦身", "cases": [...]},
+    #   {"tag": "治療", "cases": [...]},
+    # ]
     tag_to_cases: Dict[str, List[Dict[str, Any]]] = {}
     for item in vector_search_results:
         tname = item.get("tag")
@@ -111,6 +116,22 @@ async def check_compliance(request: CheckRequest):
         tag_to_cases[tname] = item.get("cases", []) or []
 
     # ---------- 5. 組成 highlights ----------
+    # final_analysis 預期結構：
+    # {
+    #   "analysis_results": [
+    #       {
+    #         "trigger_word": "...",
+    #         "tag": "...",
+    #         "reason": "...",
+    #         "law": "...",
+    #         "reference_cases": [
+    #             {"product_name": "...", "date": "..."}
+    #         ]
+    #       },
+    #       ...
+    #   ],
+    #   "suggestion": "整段改寫後文案"
+    # }
     analysis_results = final_analysis.get("analysis_results", []) or []
     highlights: List[HighlightItem] = []
 
@@ -118,7 +139,7 @@ async def check_compliance(request: CheckRequest):
         trigger_word = analysis.get("trigger_word")
         tag = analysis.get("tag")  # LLM 回傳的 tag 名稱（例如「燃脂瘦身」）
         reason = analysis.get("reason", "") or ""
-        suggestion = analysis.get("suggestion", "") or ""
+        law = analysis.get("law", "") or ""
         reference_cases = analysis.get("reference_cases", []) or []
 
         if not trigger_word or not tag:
@@ -136,7 +157,7 @@ async def check_compliance(request: CheckRequest):
         if not positions:
             positions = [{"start": -1, "end": -1}]
 
-        # 5-2. 整理案例（把連結補上）
+        # 5-2. 整理案例（把連結 + explanation 補上）
         cases_for_tag = tag_to_cases.get(tag, [])
         final_cases: List[FinalCase] = []
 
@@ -144,13 +165,16 @@ async def check_compliance(request: CheckRequest):
             ref_name = ref.get("product_name")
             ref_date = ref.get("date", "") or ""
             link = ""
+            explanation = ""
 
             if ref_name:
                 for c in cases_for_tag:
+                    # 用 product_name + date 做 match
                     if c.get("product_name") == ref_name and (
                         not ref_date or c.get("date") == ref_date
                     ):
                         link = c.get("link", "") or ""
+                        explanation = c.get("explanation", "") or ""
                         break
 
                 final_cases.append(
@@ -158,6 +182,7 @@ async def check_compliance(request: CheckRequest):
                         product_name=ref_name,
                         date=ref_date,
                         link=link,
+                        explanation=explanation,
                     )
                 )
 
@@ -168,7 +193,7 @@ async def check_compliance(request: CheckRequest):
 
         details = HighlightDetails(
             reason=reason,
-            suggestion=suggestion,
+            law=law,
             cases=final_cases,
         )
 
@@ -185,11 +210,15 @@ async def check_compliance(request: CheckRequest):
                 )
             )
 
-    # ---------- 6. 組成最後回傳 ----------
+    # ---------- 6. 整體建議（整句改寫） ----------
+    overall_suggestion = final_analysis.get("suggestion", "") or ""
+
+    # ---------- 7. 組成最後回傳 ----------
     compliance_data = ComplianceData(
         category=category,
         risk=risk,
         highlights=highlights,
+        suggestion=overall_suggestion,
     )
 
     response = CheckResponse(
@@ -201,4 +230,5 @@ async def check_compliance(request: CheckRequest):
 
 
 if __name__ == "__main__":
+    # 直接跑：python main.py
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
